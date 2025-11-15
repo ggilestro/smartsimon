@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Simon Says - Smart Edition</title>
+    <link rel="stylesheet" href="styles.css">
+    <meta name="theme-color" content="#2c3e50">
+    <link rel="manifest" href="manifest.json">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header>
+            <h1>🎮 Simon Says</h1>
+            <div class="connection-status" id="connectionStatus">
+                <span class="status-dot"></span>
+                <span class="status-text">Connecting...</span>
+            </div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <nav class="tabs">
+            <button class="tab active" data-tab="game">Game</button>
+            <button class="tab" data-tab="leaderboard">Leaderboard</button>
+            <button class="tab" data-tab="players">Players</button>
+            <button class="tab" data-tab="settings">Settings</button>
+        </nav>
+
+        <!-- Game Tab -->
+        <section id="game-tab" class="tab-content active">
+            <!-- Current Status -->
+            <div class="card status-card">
+                <h2>Current Game</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <span class="label">State:</span>
+                        <span id="gameState" class="value">IDLE</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Score:</span>
+                        <span id="currentScore" class="value">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">High Score:</span>
+                        <span id="highScore" class="value">0</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Difficulty:</span>
+                        <span id="currentDifficulty" class="value">Easy</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Game Controls -->
+            <div class="card">
+                <h2>Controls</h2>
+                <div class="control-group">
+                    <label for="playerSelect">Current Player:</label>
+                    <select id="playerSelect" class="select-field">
+                        <option value="">Guest (no stats)</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="difficulty">Select Difficulty:</label>
+                    <select id="difficulty" class="select-field">
+                        <option value="0">Easy</option>
+                        <option value="1">Medium</option>
+                        <option value="2">Hard</option>
+                        <option value="3">Expert</option>
+                    </select>
+                </div>
+
+                <div class="button-group">
+                    <button id="startBtn" class="btn btn-primary">Start Game</button>
+                    <button id="stopBtn" class="btn btn-secondary" disabled>Stop Game</button>
+                </div>
+            </div>
+
+            <!-- Visual Feedback -->
+            <div class="card simon-display">
+                <h3>Sequence Display</h3>
+                <div class="simon-colors">
+                    <div class="simon-btn" data-color="red" style="background: #e74c3c"></div>
+                    <div class="simon-btn" data-color="green" style="background: #2ecc71"></div>
+                    <div class="simon-btn" data-color="blue" style="background: #3498db"></div>
+                    <div class="simon-btn" data-color="yellow" style="background: #f1c40f"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Leaderboard Tab -->
+        <section id="leaderboard-tab" class="tab-content">
+            <div class="card">
+                <h2>🏆 All-Time High Scores</h2>
+                <div id="allTimeScores" class="scores-list">Loading...</div>
+            </div>
+
+            <div class="card">
+                <h2>📊 Per Difficulty</h2>
+                <div class="difficulty-tabs">
+                    <button class="difficulty-tab active" data-difficulty="0">Easy</button>
+                    <button class="difficulty-tab" data-difficulty="1">Medium</button>
+                    <button class="difficulty-tab" data-difficulty="2">Hard</button>
+                    <button class="difficulty-tab" data-difficulty="3">Expert</button>
+                </div>
+                <div id="difficultyScores" class="scores-list">Loading...</div>
+            </div>
+
+            <div class="card">
+                <h2>📜 Recent Games</h2>
+                <div id="recentGames" class="scores-list">Loading...</div>
+            </div>
+        </section>
+
+        <!-- Players Tab -->
+        <section id="players-tab" class="tab-content">
+            <div class="card">
+                <h2>Create Player</h2>
+                <div class="control-group">
+                    <input type="text" id="playerName" class="input-field" placeholder="Enter player name" maxlength="20">
+                    <button id="createPlayerBtn" class="btn btn-primary">Create Player</button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h2>All Players</h2>
+                <div id="playersList" class="players-list">Loading...</div>
+            </div>
+        </section>
+
+        <!-- Settings Tab -->
+        <section id="settings-tab" class="tab-content">
+            <div class="card">
+                <h2>Game Settings</h2>
+
+                <div class="control-group">
+                    <label for="volumeSlider">Volume: <span id="volumeValue">80</span>%</label>
+                    <input type="range" id="volumeSlider" min="0" max="100" value="80" class="slider">
+                </div>
+
+                <div class="control-group">
+                    <label for="brightnessSlider">LED Brightness: <span id="brightnessValue">200</span></label>
+                    <input type="range" id="brightnessSlider" min="0" max="255" value="200" class="slider">
+                </div>
+
+                <div class="control-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="soundEnabled" checked>
+                        Sound Enabled
+                    </label>
+                </div>
+
+                <div class="control-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="deepSleepEnabled" checked>
+                        Deep Sleep Enabled
+                    </label>
+                </div>
+
+                <button id="saveSettingsBtn" class="btn btn-primary">Save Settings</button>
+            </div>
+
+            <div class="card">
+                <h2>Storage</h2>
+                <div id="storageInfo">Loading...</div>
+            </div>
+
+            <div class="card danger-zone">
+                <h2>⚠️ Danger Zone</h2>
+                <p>Reset all data (players, scores, settings)</p>
+                <button id="factoryResetBtn" class="btn btn-danger">Factory Reset</button>
+            </div>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
