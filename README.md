@@ -17,6 +17,56 @@ A modernized version of the classic "Simon Says" electronic memory game, powered
 - 🔋 **Battery powered** (3x AAA batteries with deep sleep power management)
 - 📱 **Responsive web interface** accessible from any device on the network
 
+## Quick Start Guide
+
+### Choosing Your Board
+
+Both ESP32 variants are fully supported. Choose based on your needs:
+
+| Feature | ESP32-WROOM-32 | ESP32-C3 |
+|---------|----------------|----------|
+| **CPU** | Dual-core Xtensa (240MHz) | Single-core RISC-V (160MHz) |
+| **GPIO Pins** | 34 usable | 22 usable |
+| **WiFi** | 2.4GHz 802.11 b/g/n | 2.4GHz 802.11 b/g/n |
+| **Bluetooth** | Classic + BLE | BLE 5.0 only |
+| **Size** | Larger | More compact |
+| **Cost** | ~$4-6 | ~$2-4 |
+| **Recommendation** | Best overall compatibility | Budget-friendly, smaller projects |
+
+**Both boards run identical code with automatic pin configuration.**
+
+### Hardware Setup Steps
+
+1. **Wire the components** according to the pin diagrams below (choose your board)
+2. **Connect power circuit** (3x AAA batteries → regulator → ESP32)
+3. **Install PlatformIO** (VSCode extension or CLI)
+4. **Build and upload** firmware to your board
+5. **Upload filesystem** (web interface files)
+6. **Connect to WiFi** and start playing!
+
+### Pin Reference Table
+
+Quick reference for wiring your board:
+
+| Component | ESP32-WROOM-32 | ESP32-C3 | Notes |
+|-----------|----------------|----------|-------|
+| **LEDs** |
+| Red LED | GPIO 26 | GPIO 3 | Through 330Ω resistor |
+| Green LED | GPIO 33 | GPIO 4 | Through 330Ω resistor |
+| Blue LED | GPIO 25 | GPIO 5 | Through 330Ω resistor |
+| Yellow LED | GPIO 32 | GPIO 6 | Through 330Ω resistor |
+| **Buttons** |
+| Red Button | GPIO 13 | GPIO 7 | Active LOW, pull-up |
+| Green Button | GPIO 14 | GPIO 10 | Active LOW, pull-up |
+| Blue Button | GPIO 12 | GPIO 18 | Active LOW, pull-up |
+| Yellow Button | GPIO 27 | GPIO 19 | Active LOW, pull-up |
+| **Audio** |
+| Speaker | GPIO 23 | GPIO 20 | Piezo buzzer |
+| **Power** |
+| Power Button | GPIO 15 | GPIO 21 | Active LOW, pull-up |
+| Battery ADC | GPIO 36 (VP) | GPIO 1 (ADC1_CH1) | 10kΩ voltage divider |
+| Status LED | GPIO 2 | GPIO 8 | Built-in LED |
+
 ## Hardware Requirements
 
 ### Supported Boards
@@ -130,6 +180,33 @@ Status:
 - Fresh AAA batteries: ~1.6V each = 4.8V total ✓
 - Depleted AAA batteries: ~1.2V each = 3.6V total (too low - replace)
 - Add 100µF and 10µF capacitors near regulator for stability
+
+### Platform-Specific Considerations
+
+#### ESP32-WROOM-32
+- ✅ More GPIO pins available (34 usable)
+- ✅ Dual-core processor for better multitasking
+- ✅ Both Classic Bluetooth and BLE
+- ✅ Well-established, extensive documentation
+- ⚠️ Slightly larger footprint
+- ⚠️ Higher cost (~$4-6)
+
+#### ESP32-C3
+- ✅ More affordable (~$2-4)
+- ✅ Smaller form factor
+- ✅ BLE 5.0 support
+- ✅ Lower power consumption
+- ✅ RISC-V architecture (open-source ISA)
+- ⚠️ Single-core processor
+- ⚠️ Fewer GPIO pins (22 total)
+- ⚠️ No Classic Bluetooth (BLE only)
+- ⚠️ GPIO 11-17 reserved for flash (avoid using)
+
+**Important ESP32-C3 Notes:**
+- GPIO 0, 8, 9 have special functions during boot - avoid for critical inputs
+- GPIO 2 is used for USB D+ (if using USB serial)
+- GPIO 8 is typically the built-in LED on most C3 dev boards
+- ADC2 pins cannot be used when WiFi is active (we use GPIO 1 which is ADC1_CH1)
 
 ## Software Setup
 
@@ -345,7 +422,7 @@ The ESP32 uses aggressive power management to extend battery life:
 
 ### No sound from speaker
 - Verify piezo speaker polarity
-- Check GPIO 23 connection
+- Check speaker GPIO connection (GPIO 23 for ESP32-WROOM, GPIO 20 for ESP32-C3)
 - Ensure FEATURE_SOUND_ENABLED is true in config.h
 
 ### Web interface not loading
@@ -353,6 +430,29 @@ The ESP32 uses aggressive power management to extend battery life:
 - Verify filesystem was uploaded (`pio run --target uploadfs`)
 - Try IP address instead of mDNS name
 - Clear browser cache
+
+### ESP32-C3 Specific Issues
+
+#### Upload fails or can't connect to board
+- **ESP32-C3 uses USB serial by default** - make sure you're using the correct USB port
+- Some C3 boards require holding BOOT button while connecting
+- Try reducing upload speed: `upload_speed = 115200` in platformio.ini
+- Check USB cable - must support data transfer (not charging-only)
+
+#### Code compiles but won't run
+- Verify you're building with correct environment: `pio run -e esp32-c3`
+- Check that platformio selected the right board variant
+- Some C3 variants need specific board definitions (esp32-c3-devkitm-1, esp32-c3-devkitc-02)
+
+#### GPIO not working as expected
+- Avoid GPIO 0, 8, 9 during boot (used for boot mode selection)
+- GPIO 11-17 are used for flash - never use these
+- If battery ADC reads incorrectly, verify GPIO 1 is ADC1_CH1 capable on your board variant
+
+#### WiFi connection issues (C3-specific)
+- ESP32-C3 may have different WiFi calibration - try power cycling
+- Some C3 boards have weaker WiFi antenna - ensure good signal strength
+- Check that you're using a 2.4GHz network (5GHz not supported)
 
 ## Development
 
