@@ -17,6 +17,9 @@ SimonGame::SimonGame(LEDController* leds, ButtonHandler* buttons, AudioControlle
     wsHandler(nullptr),
     state(IDLE),
     currentDifficulty(EASY),
+    gameMode(SINGLE_PLAYER),
+    numPlayers(0),
+    currentPlayerIndex(0),
     sequenceLength(0),
     currentStep(0),
     currentScore(0),
@@ -32,6 +35,14 @@ SimonGame::SimonGame(LEDController* leds, ButtonHandler* buttons, AudioControlle
     // Initialize high scores
     for (uint8_t i = 0; i < NUM_DIFFICULTIES; i++) {
         highScores[i] = 0;
+    }
+
+    // Initialize player scores
+    for (uint8_t i = 0; i < 4; i++) {
+        players[i].playerId = "";
+        players[i].playerName = "";
+        players[i].score = 0;
+        players[i].eliminated = false;
     }
 }
 
@@ -158,6 +169,87 @@ void SimonGame::setCurrentPlayer(const String& playerId) {
     sendWebSocketUpdate();
 }
 
+void SimonGame::startMultiplayerGame(GameMode mode, const String* playerIds, uint8_t numPlayers_, DifficultyLevel difficulty) {
+    DEBUG_PRINTF("[GAME] Starting multiplayer game! Mode: %d, Players: %d\n", mode, numPlayers_);
+
+    if (numPlayers_ < 2 || numPlayers_ > 4) {
+        DEBUG_PRINTLN("[GAME] Error: Invalid number of players (2-4 required)");
+        return;
+    }
+
+    // Set game mode
+    gameMode = mode;
+    numPlayers = numPlayers_;
+    currentPlayerIndex = 0;
+
+    // Initialize player data
+    for (uint8_t i = 0; i < numPlayers; i++) {
+        players[i].playerId = playerIds[i];
+        players[i].score = 0;
+        players[i].eliminated = false;
+
+        // Load player name from storage
+        if (storage) {
+            Player player;
+            if (storage->getPlayer(playerIds[i], player)) {
+                players[i].playerName = player.name;
+            } else {
+                players[i].playerName = "Player " + String(i + 1);
+            }
+        } else {
+            players[i].playerName = "Player " + String(i + 1);
+        }
+
+        DEBUG_PRINTF("[GAME] Player %d: %s (%s)\n", i + 1, players[i].playerName.c_str(), players[i].playerId.c_str());
+    }
+
+    // Set current player
+    currentPlayerId = players[0].playerId;
+
+    // Play fun game start melody
+    audio->playGameStart();
+
+    // Set difficulty
+    setDifficulty(difficulty);
+
+    // Reset game state
+    sequenceLength = 0;
+    currentStep = 0;
+    currentScore = 0;
+    gameStartTime = millis();
+
+    // Clear sequence
+    for (uint8_t i = 0; i < MAX_SEQUENCE_LENGTH; i++) {
+        sequence[i] = NONE;
+    }
+
+    // Start first round
+    extendSequence();
+    setState(SHOWING_SEQUENCE);
+
+    // Send WebSocket update
+    sendMultiplayerUpdate();
+}
+
+GameMode SimonGame::getGameMode() const {
+    return gameMode;
+}
+
+String SimonGame::getCurrentPlayer() const {
+    if (gameMode == SINGLE_PLAYER) {
+        return currentPlayerId;
+    }
+    return players[currentPlayerIndex].playerId;
+}
+
+const PlayerScore* SimonGame::getPlayerScores() const {
+    return players;
+}
+
+uint8_t SimonGame::getNumPlayers() const {
+    return numPlayers;
+}
+
 // ============================================================================
 // State Handlers
 // ============================================================================
@@ -231,11 +323,32 @@ void SimonGame::handleInputCorrect() {
     currentScore++;
     DEBUG_PRINTF("[GAME] Score: %d\n", currentScore);
 
+    // Update player score in multiplayer
+    if (gameMode != SINGLE_PLAYER) {
+        players[currentPlayerIndex].score = currentScore;
+        sendMultiplayerUpdate();
+    }
+
     // Check if max length reached
     if (sequenceLength >= settings.maxLength) {
         DEBUG_PRINTLN("[GAME] Maximum length reached - you win!");
-        updateHighScore();
-        setState(GAME_OVER);
+
+        if (gameMode == SINGLE_PLAYER) {
+            updateHighScore();
+            setState(GAME_OVER);
+        } else if (gameMode == PASS_AND_PLAY) {
+            // In pass-and-play, move to next player
+            nextPlayer();
+            setState(SHOWING_SEQUENCE);
+        } else if (gameMode == COMPETITIVE) {
+            // In competitive, check if all players done
+            if (currentPlayerIndex >= numPlayers - 1) {
+                setState(GAME_OVER);
+            } else {
+                nextPlayer();
+                setState(SHOWING_SEQUENCE);
+            }
+        }
         return;
     }
 
@@ -252,20 +365,77 @@ void SimonGame::handleInputWrong() {
     led->errorAnimation();
     audio->playGameOver();
 
-    // Check if new high score
-    bool isNewHighScore = (currentScore > highScores[currentDifficulty]);
+    if (gameMode == SINGLE_PLAYER) {
+        // Single player mode - game over
+        bool isNewHighScore = (currentScore > highScores[currentDifficulty]);
+        updateHighScore();
+        recordGameSession();
+        sendGameOverUpdate(isNewHighScore);
+        setState(GAME_OVER);
 
-    // Update high score if needed
-    updateHighScore();
+    } else if (gameMode == PASS_AND_PLAY) {
+        // Pass-and-play mode - eliminate player and move to next
+        DEBUG_PRINTF("[GAME] Player %s eliminated with score %d\n",
+                    players[currentPlayerIndex].playerName.c_str(), currentScore);
 
-    // Record game session
-    recordGameSession();
+        eliminateCurrentPlayer();
 
-    // Send game over update
-    sendGameOverUpdate(isNewHighScore);
+        // Check if game is over (only one player left)
+        if (isLastPlayerStanding()) {
+            DEBUG_PRINTLN("[GAME] Pass-and-play winner determined!");
+            // Record all player sessions
+            for (uint8_t i = 0; i < numPlayers; i++) {
+                currentPlayerId = players[i].playerId;
+                currentScore = players[i].score;
+                recordGameSession();
+            }
+            setState(GAME_OVER);
+        } else {
+            // Move to next player
+            nextPlayer();
+            delay(1000);  // Brief pause before next player
+            setState(SHOWING_SEQUENCE);
+        }
 
-    // Transition to game over
-    setState(GAME_OVER);
+    } else if (gameMode == COMPETITIVE) {
+        // Competitive mode - record score and move to next player
+        DEBUG_PRINTF("[GAME] Player %s finished with score %d\n",
+                    players[currentPlayerIndex].playerName.c_str(), currentScore);
+
+        players[currentPlayerIndex].score = currentScore;
+        players[currentPlayerIndex].eliminated = true;
+
+        // Check if all players have finished
+        if (currentPlayerIndex >= numPlayers - 1) {
+            DEBUG_PRINTLN("[GAME] All players finished!");
+            // Record all player sessions
+            for (uint8_t i = 0; i < numPlayers; i++) {
+                currentPlayerId = players[i].playerId;
+                currentScore = players[i].score;
+                recordGameSession();
+            }
+            setState(GAME_OVER);
+        } else {
+            // Move to next player and reset for their turn
+            nextPlayer();
+            delay(1000);  // Brief pause before next player
+
+            // Reset sequence for next player
+            sequenceLength = 0;
+            currentScore = 0;
+            currentStep = 0;
+
+            // Clear and start fresh sequence
+            for (uint8_t i = 0; i < MAX_SEQUENCE_LENGTH; i++) {
+                sequence[i] = NONE;
+            }
+            extendSequence();
+
+            setState(SHOWING_SEQUENCE);
+        }
+    }
+
+    sendMultiplayerUpdate();
 }
 
 void SimonGame::handleGameOver() {
@@ -522,6 +692,82 @@ void SimonGame::sendGameOverUpdate(bool newHighScore) {
     doc["type"] = "gameOver";
     doc["score"] = currentScore;
     doc["highScore"] = newHighScore;
+
+    wsHandler->broadcast(doc);
+}
+
+// ============================================================================
+// Multiplayer Helper Methods
+// ============================================================================
+
+void SimonGame::nextPlayer() {
+    // Find next non-eliminated player
+    uint8_t startIndex = currentPlayerIndex;
+
+    do {
+        currentPlayerIndex = (currentPlayerIndex + 1) % numPlayers;
+
+        // If we've gone full circle, break
+        if (currentPlayerIndex == startIndex && players[currentPlayerIndex].eliminated) {
+            break;
+        }
+
+        // Found a non-eliminated player
+        if (!players[currentPlayerIndex].eliminated) {
+            currentPlayerId = players[currentPlayerIndex].playerId;
+            currentScore = players[currentPlayerIndex].score;
+
+            DEBUG_PRINTF("[GAME] Next player: %s (index %d)\n",
+                        players[currentPlayerIndex].playerName.c_str(), currentPlayerIndex);
+
+            sendMultiplayerUpdate();
+            return;
+        }
+    } while (true);
+
+    DEBUG_PRINTLN("[GAME] Warning: No non-eliminated players found!");
+}
+
+void SimonGame::eliminateCurrentPlayer() {
+    players[currentPlayerIndex].eliminated = true;
+    players[currentPlayerIndex].score = currentScore;
+
+    DEBUG_PRINTF("[GAME] Player %s eliminated\n", players[currentPlayerIndex].playerName.c_str());
+}
+
+bool SimonGame::isLastPlayerStanding() {
+    uint8_t activePlayers = 0;
+
+    for (uint8_t i = 0; i < numPlayers; i++) {
+        if (!players[i].eliminated) {
+            activePlayers++;
+        }
+    }
+
+    DEBUG_PRINTF("[GAME] Active players remaining: %d\n", activePlayers);
+    return activePlayers <= 1;
+}
+
+void SimonGame::sendMultiplayerUpdate() {
+    if (!wsHandler || gameMode == SINGLE_PLAYER) {
+        return;
+    }
+
+    StaticJsonDocument<512> doc;
+    doc["type"] = "multiplayer";
+    doc["gameMode"] = (int)gameMode;
+    doc["currentPlayerIndex"] = currentPlayerIndex;
+    doc["currentPlayerId"] = players[currentPlayerIndex].playerId;
+    doc["currentPlayerName"] = players[currentPlayerIndex].playerName;
+
+    JsonArray playersArray = doc.createNestedArray("players");
+    for (uint8_t i = 0; i < numPlayers; i++) {
+        JsonObject playerObj = playersArray.createNestedObject();
+        playerObj["id"] = players[i].playerId;
+        playerObj["name"] = players[i].playerName;
+        playerObj["score"] = players[i].score;
+        playerObj["eliminated"] = players[i].eliminated;
+    }
 
     wsHandler->broadcast(doc);
 }

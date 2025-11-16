@@ -22,6 +22,7 @@
         <!-- Tab Navigation -->
         <nav class="tabs">
             <button class="tab active" data-tab="game">Game</button>
+            <button class="tab" data-tab="multiplayer">Multiplayer</button>
             <button class="tab" data-tab="leaderboard">Leaderboard</button>
             <button class="tab" data-tab="players">Players</button>
             <button class="tab" data-tab="settings">Settings</button>
@@ -86,6 +87,69 @@
                     <div class="simon-btn" data-color="green" style="background: #2ecc71"></div>
                     <div class="simon-btn" data-color="blue" style="background: #3498db"></div>
                     <div class="simon-btn" data-color="yellow" style="background: #f1c40f"></div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Multiplayer Tab -->
+        <section id="multiplayer-tab" class="tab-content">
+            <div class="card">
+                <h2>👥 Multiplayer Mode</h2>
+                <p class="help-text">Play with 2-4 players on the same device!</p>
+
+                <div class="control-group">
+                    <label>Game Mode:</label>
+                    <div class="radio-group">
+                        <label class="radio-label">
+                            <input type="radio" name="gameMode" value="1" checked>
+                            <span>Pass & Play - Players take turns on same sequence</span>
+                        </label>
+                        <label class="radio-label">
+                            <input type="radio" name="gameMode" value="2">
+                            <span>Competitive - Each player gets their own sequence</span>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="control-group">
+                    <label for="multiplayerDifficulty">Difficulty:</label>
+                    <select id="multiplayerDifficulty" class="select-field">
+                        <option value="0">Easy</option>
+                        <option value="1">Medium</option>
+                        <option value="2">Hard</option>
+                        <option value="3">Expert</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label>Select Players (2-4):</label>
+                    <div id="multiplayerPlayerList" class="checkbox-group">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <button id="startMultiplayerBtn" class="btn btn-primary" disabled>
+                    Start Multiplayer Game
+                </button>
+            </div>
+
+            <!-- Multiplayer Game Status -->
+            <div id="multiplayerStatus" class="card" style="display: none;">
+                <h2>Game in Progress</h2>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <span class="label">Current Player:</span>
+                        <span id="multiCurrentPlayer" class="value">-</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="label">Current Score:</span>
+                        <span id="multiCurrentScore" class="value">0</span>
+                    </div>
+                </div>
+
+                <h3>Player Scores</h3>
+                <div id="multiplayerScores" class="scores-list">
+                    <!-- Populated by WebSocket -->
                 </div>
             </div>
         </section>

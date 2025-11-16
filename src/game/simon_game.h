@@ -35,6 +35,25 @@ enum GameState {
 };
 
 /**
+ * Game mode enumeration
+ */
+enum GameMode {
+    SINGLE_PLAYER,     // Single player mode (default)
+    PASS_AND_PLAY,     // Players take turns on same sequence
+    COMPETITIVE        // Players compete for best score
+};
+
+/**
+ * Player score for multiplayer
+ */
+struct PlayerScore {
+    String playerId;
+    String playerName;
+    uint8_t score;
+    bool eliminated;   // For pass-and-play mode
+};
+
+/**
  * Simon Says Game Class
  */
 class SimonGame {
@@ -139,6 +158,49 @@ public:
      */
     void setCurrentPlayer(const String& playerId);
 
+    /**
+     * Start a multiplayer game
+     *
+     * Args:
+     *     mode: Game mode (PASS_AND_PLAY or COMPETITIVE)
+     *     playerIds: Array of player IDs
+     *     numPlayers: Number of players
+     *     difficulty: Difficulty level
+     */
+    void startMultiplayerGame(GameMode mode, const String* playerIds, uint8_t numPlayers, DifficultyLevel difficulty = EASY);
+
+    /**
+     * Get current game mode
+     *
+     * Returns:
+     *     GameMode: Current game mode
+     */
+    GameMode getGameMode() const;
+
+    /**
+     * Get current player in multiplayer game
+     *
+     * Returns:
+     *     String: Current player ID
+     */
+    String getCurrentPlayer() const;
+
+    /**
+     * Get all player scores in multiplayer game
+     *
+     * Returns:
+     *     const PlayerScore*: Array of player scores
+     */
+    const PlayerScore* getPlayerScores() const;
+
+    /**
+     * Get number of players in multiplayer game
+     *
+     * Returns:
+     *     uint8_t: Number of players
+     */
+    uint8_t getNumPlayers() const;
+
 private:
     // Hardware references
     LEDController* led;
@@ -157,6 +219,12 @@ private:
     // Session tracking
     String currentPlayerId;
     uint32_t gameStartTime;
+
+    // Multiplayer support
+    GameMode gameMode;
+    PlayerScore players[4];  // Max 4 players
+    uint8_t numPlayers;
+    uint8_t currentPlayerIndex;
 
     // Sequence data
     Color sequence[MAX_SEQUENCE_LENGTH];
@@ -283,4 +351,12 @@ private:
      *     newHighScore: Whether a new high score was achieved
      */
     void sendGameOverUpdate(bool newHighScore);
+
+    /**
+     * Multiplayer helper methods
+     */
+    void nextPlayer();
+    void eliminateCurrentPlayer();
+    bool isLastPlayerStanding();
+    void sendMultiplayerUpdate();
 };

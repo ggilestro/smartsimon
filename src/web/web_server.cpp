@@ -95,6 +95,11 @@ void SimonWebServer::setupRoutes() {
         handleSetPlayer(request, data, len);
     });
 
+    server.on("/api/game/multiplayer/start", HTTP_POST, [](AsyncWebServerRequest *request) {},
+        NULL, [this](AsyncWebServerRequest *request, uint8_t *data, size_t len, size_t index, size_t total) {
+        handleStartMultiplayer(request, data, len);
+    });
+
     // Score endpoints
     server.on("/api/scores/high", HTTP_GET, [this](AsyncWebServerRequest *request) {
         handleGetHighScores(request);
@@ -338,6 +343,67 @@ void SimonWebServer::handleSetPlayer(AsyncWebServerRequest *request, uint8_t *da
     response["success"] = true;
     response["message"] = "Current player set";
     response["playerId"] = playerId;
+
+    sendJson(request, response);
+}
+
+void SimonWebServer::handleStartMultiplayer(AsyncWebServerRequest *request, uint8_t *data, size_t len) {
+    StaticJsonDocument<512> doc;
+    DeserializationError error = deserializeJson(doc, data, len);
+
+    if (error) {
+        sendError(request, "Invalid JSON");
+        return;
+    }
+
+    // Parse game mode
+    int modeInt = doc["mode"].as<int>();
+    GameMode mode;
+    if (modeInt == 1) {
+        mode = PASS_AND_PLAY;
+    } else if (modeInt == 2) {
+        mode = COMPETITIVE;
+    } else {
+        sendError(request, "Invalid game mode (1=Pass&Play, 2=Competitive)");
+        return;
+    }
+
+    // Parse difficulty
+    DifficultyLevel difficulty = (DifficultyLevel)doc["difficulty"].as<int>();
+    if (difficulty >= NUM_DIFFICULTIES) {
+        difficulty = EASY;
+    }
+
+    // Parse player IDs
+    JsonArray playerIdsArray = doc["playerIds"].as<JsonArray>();
+    if (playerIdsArray.size() < 2 || playerIdsArray.size() > 4) {
+        sendError(request, "Must have 2-4 players");
+        return;
+    }
+
+    String playerIds[4];
+    uint8_t numPlayers = playerIdsArray.size();
+
+    for (uint8_t i = 0; i < numPlayers; i++) {
+        playerIds[i] = playerIdsArray[i].as<String>();
+
+        // Verify player exists
+        Player player;
+        if (!storage->getPlayer(playerIds[i], player)) {
+            String errorMsg = "Player not found: " + playerIds[i];
+            sendError(request, errorMsg.c_str(), 404);
+            return;
+        }
+    }
+
+    // Start multiplayer game
+    game->startMultiplayerGame(mode, playerIds, numPlayers, difficulty);
+
+    StaticJsonDocument<256> response;
+    response["success"] = true;
+    response["message"] = "Multiplayer game started";
+    response["mode"] = modeInt;
+    response["numPlayers"] = numPlayers;
 
     sendJson(request, response);
 }

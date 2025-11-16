@@ -104,6 +104,144 @@ function initControls() {
 
     document.getElementById('saveSettingsBtn').addEventListener('click', saveSettings);
     document.getElementById('factoryResetBtn').addEventListener('click', factoryReset);
+
+    // Multiplayer controls
+    initMultiplayer();
+}
+
+// ============================================================================
+// Multiplayer Functions
+// ============================================================================
+
+function initMultiplayer() {
+    // Load player checkboxes
+    loadMultiplayerPlayers();
+
+    // Start button
+    document.getElementById('startMultiplayerBtn').addEventListener('click', startMultiplayerGame);
+
+    // Listen for checkbox changes to enable/disable start button
+    document.getElementById('multiplayerPlayerList').addEventListener('change', validateMultiplayerSelection);
+}
+
+async function loadMultiplayerPlayers() {
+    try {
+        const response = await fetch(`${API_BASE}/api/players`);
+        const players = await response.json();
+
+        const container = document.getElementById('multiplayerPlayerList');
+        container.innerHTML = '';
+
+        if (players.length === 0) {
+            container.innerHTML = '<p class="help-text">No players available. Create players in the Players tab first.</p>';
+            return;
+        }
+
+        players.forEach(player => {
+            const label = document.createElement('label');
+            label.className = 'checkbox-label';
+            label.innerHTML = `
+                <input type="checkbox" name="multiplayerPlayer" value="${player.id}">
+                <span>${player.name} (Best: ${player.bestScore}, Games: ${player.gamesPlayed})</span>
+            `;
+            container.appendChild(label);
+        });
+
+        validateMultiplayerSelection();
+    } catch (error) {
+        console.error('Error loading multiplayer players:', error);
+        showToast('Failed to load players', 'error');
+    }
+}
+
+function validateMultiplayerSelection() {
+    const checkboxes = document.querySelectorAll('input[name="multiplayerPlayer"]:checked');
+    const startBtn = document.getElementById('startMultiplayerBtn');
+    const count = checkboxes.length;
+
+    startBtn.disabled = (count < 2 || count > 4);
+
+    if (count < 2) {
+        startBtn.textContent = 'Select 2-4 Players';
+    } else if (count > 4) {
+        startBtn.textContent = 'Max 4 Players';
+    } else {
+        startBtn.textContent = `Start Multiplayer Game (${count} players)`;
+    }
+}
+
+async function startMultiplayerGame() {
+    const checkboxes = document.querySelectorAll('input[name="multiplayerPlayer"]:checked');
+    const playerIds = Array.from(checkboxes).map(cb => cb.value);
+
+    if (playerIds.length < 2 || playerIds.length > 4) {
+        showToast('Please select 2-4 players', 'error');
+        return;
+    }
+
+    const mode = parseInt(document.querySelector('input[name="gameMode"]:checked').value);
+    const difficulty = parseInt(document.getElementById('multiplayerDifficulty').value);
+
+    try {
+        const response = await fetch(`${API_BASE}/api/game/multiplayer/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                mode: mode,
+                difficulty: difficulty,
+                playerIds: playerIds
+            })
+        });
+
+        if (response.ok) {
+            const modeName = mode === 1 ? 'Pass & Play' : 'Competitive';
+            showToast(`${modeName} game started!`, 'success');
+
+            // Show multiplayer status card
+            document.getElementById('multiplayerStatus').style.display = 'block';
+        } else {
+            const error = await response.text();
+            showToast(`Failed to start game: ${error}`, 'error');
+        }
+    } catch (error) {
+        console.error('Error starting multiplayer game:', error);
+        showToast('Failed to start multiplayer game', 'error');
+    }
+}
+
+function handleMultiplayerUpdate(data) {
+    const currentPlayerEl = document.getElementById('multiCurrentPlayer');
+    const currentScoreEl = document.getElementById('multiCurrentScore');
+    const scoresEl = document.getElementById('multiplayerScores');
+
+    // Update current player
+    if (currentPlayerEl && data.currentPlayerName) {
+        currentPlayerEl.textContent = data.currentPlayerName;
+    }
+
+    // Update current score (from game state message)
+    if (currentScoreEl) {
+        const score = document.getElementById('currentScore').textContent;
+        currentScoreEl.textContent = score;
+    }
+
+    // Update all player scores
+    if (scoresEl && data.players) {
+        let html = '<div class="player-scores">';
+        data.players.forEach((player, index) => {
+            const statusClass = player.eliminated ? 'eliminated' : (index === data.currentPlayerIndex ? 'active' : '');
+            const statusText = player.eliminated ? '❌ Eliminated' : (index === data.currentPlayerIndex ? '▶️ Playing' : '⏸️ Waiting');
+
+            html += `
+                <div class="score-item ${statusClass}">
+                    <span>${player.name}</span>
+                    <span>${player.score} - ${statusText}</span>
+                </div>
+            `;
+        });
+        html += '</div>';
+        scoresEl.innerHTML = html;
+    }
 }
 
 // ============================================================================
@@ -195,6 +333,9 @@ function handleWebSocketMessage(data) {
             break;
         case 'gameOver':
             showGameOver(data);
+            break;
+        case 'multiplayer':
+            handleMultiplayerUpdate(data);
             break;
     }
 }

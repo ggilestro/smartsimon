@@ -83,6 +83,7 @@ private:
     void handleStartGame(AsyncWebServerRequest *request, uint8_t *data, size_t len);
     void handleStopGame(AsyncWebServerRequest *request);
     void handleSetPlayer(AsyncWebServerRequest *request, uint8_t *data, size_t len);
+    void handleStartMultiplayer(AsyncWebServerRequest *request, uint8_t *data, size_t len);
 
     // Score endpoints
     void handleGetHighScores(AsyncWebServerRequest *request);
