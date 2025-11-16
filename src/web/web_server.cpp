@@ -356,17 +356,8 @@ void SimonWebServer::handleStartMultiplayer(AsyncWebServerRequest *request, uint
         return;
     }
 
-    // Parse game mode
-    int modeInt = doc["mode"].as<int>();
-    GameMode mode;
-    if (modeInt == 1) {
-        mode = PASS_AND_PLAY;
-    } else if (modeInt == 2) {
-        mode = COMPETITIVE;
-    } else {
-        sendError(request, "Invalid game mode (1=Pass&Play, 2=Competitive)");
-        return;
-    }
+    // Game mode is always PASS_AND_PLAY for multiplayer
+    GameMode mode = PASS_AND_PLAY;
 
     // Parse difficulty
     DifficultyLevel difficulty = (DifficultyLevel)doc["difficulty"].as<int>();
@@ -402,7 +393,6 @@ void SimonWebServer::handleStartMultiplayer(AsyncWebServerRequest *request, uint
     StaticJsonDocument<256> response;
     response["success"] = true;
     response["message"] = "Multiplayer game started";
-    response["mode"] = modeInt;
     response["numPlayers"] = numPlayers;
 
     sendJson(request, response);

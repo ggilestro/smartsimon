@@ -179,7 +179,6 @@ async function startMultiplayerGame() {
         return;
     }
 
-    const mode = parseInt(document.querySelector('input[name="gameMode"]:checked').value);
     const difficulty = parseInt(document.getElementById('multiplayerDifficulty').value);
 
     try {
@@ -187,15 +186,13 @@ async function startMultiplayerGame() {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                mode: mode,
                 difficulty: difficulty,
                 playerIds: playerIds
             })
         });
 
         if (response.ok) {
-            const modeName = mode === 1 ? 'Pass & Play' : 'Competitive';
-            showToast(`${modeName} game started!`, 'success');
+            showToast('Multiplayer game started!', 'success');
 
             // Show multiplayer status card
             document.getElementById('multiplayerStatus').style.display = 'block';
@@ -229,8 +226,8 @@ function handleMultiplayerUpdate(data) {
     if (scoresEl && data.players) {
         let html = '<div class="player-scores">';
         data.players.forEach((player, index) => {
-            const statusClass = player.eliminated ? 'eliminated' : (index === data.currentPlayerIndex ? 'active' : '');
-            const statusText = player.eliminated ? '❌ Eliminated' : (index === data.currentPlayerIndex ? '▶️ Playing' : '⏸️ Waiting');
+            const statusClass = player.hasPlayed ? 'eliminated' : (index === data.currentPlayerIndex ? 'active' : '');
+            const statusText = player.hasPlayed ? '✓ Finished' : (index === data.currentPlayerIndex ? '▶️ Playing' : '⏸️ Waiting');
 
             html += `
                 <div class="score-item ${statusClass}">
@@ -300,6 +297,7 @@ function updateConnectionStatus(status) {
     const statusEl = document.getElementById('connectionStatus');
     const dot = statusEl.querySelector('.status-dot');
     const text = statusEl.querySelector('.status-text');
+    const overlay = document.getElementById('connectionOverlay');
 
     dot.className = 'status-dot';
 
@@ -307,13 +305,23 @@ function updateConnectionStatus(status) {
         case 'connected':
             dot.classList.add('connected');
             text.textContent = 'Connected';
+            // Hide overlay when connected
+            overlay.classList.add('hidden');
             break;
         case 'disconnected':
             dot.classList.add('disconnected');
             text.textContent = 'Disconnected';
+            // Show overlay when disconnected
+            overlay.classList.remove('hidden');
+            overlay.querySelector('h2').textContent = 'Connection Lost';
+            overlay.querySelector('p').textContent = 'Reconnecting to device...';
             break;
         case 'connecting':
             text.textContent = 'Connecting...';
+            // Show overlay when connecting
+            overlay.classList.remove('hidden');
+            overlay.querySelector('h2').textContent = 'Connecting to Device...';
+            overlay.querySelector('p').textContent = 'Please wait while we establish connection';
             break;
     }
 }

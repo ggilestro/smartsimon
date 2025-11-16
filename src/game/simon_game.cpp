@@ -20,6 +20,7 @@ SimonGame::SimonGame(LEDController* leds, ButtonHandler* buttons, AudioControlle
     gameMode(SINGLE_PLAYER),
     numPlayers(0),
     currentPlayerIndex(0),
+    masterSequenceLength(0),
     sequenceLength(0),
     currentStep(0),
     currentScore(0),
@@ -42,7 +43,7 @@ SimonGame::SimonGame(LEDController* leds, ButtonHandler* buttons, AudioControlle
         players[i].playerId = "";
         players[i].playerName = "";
         players[i].score = 0;
-        players[i].eliminated = false;
+        players[i].hasPlayed = false;
     }
 }
 
@@ -181,12 +182,13 @@ void SimonGame::startMultiplayerGame(GameMode mode, const String* playerIds, uin
     gameMode = mode;
     numPlayers = numPlayers_;
     currentPlayerIndex = 0;
+    masterSequenceLength = 0;  // Will grow as first player progresses
 
     // Initialize player data
     for (uint8_t i = 0; i < numPlayers; i++) {
         players[i].playerId = playerIds[i];
         players[i].score = 0;
-        players[i].eliminated = false;
+        players[i].hasPlayed = false;
 
         // Load player name from storage
         if (storage) {
@@ -324,7 +326,7 @@ void SimonGame::handleInputCorrect() {
     DEBUG_PRINTF("[GAME] Score: %d\n", currentScore);
 
     // Update player score in multiplayer
-    if (gameMode != SINGLE_PLAYER) {
+    if (gameMode == PASS_AND_PLAY) {
         players[currentPlayerIndex].score = currentScore;
         sendMultiplayerUpdate();
     }
@@ -335,27 +337,16 @@ void SimonGame::handleInputCorrect() {
 
         if (gameMode == SINGLE_PLAYER) {
             updateHighScore();
-            setState(GAME_OVER);
-        } else if (gameMode == PASS_AND_PLAY) {
-            // In pass-and-play, move to next player
-            nextPlayer();
-            setState(SHOWING_SEQUENCE);
-        } else if (gameMode == COMPETITIVE) {
-            // In competitive, check if all players done
-            if (currentPlayerIndex >= numPlayers - 1) {
-                setState(GAME_OVER);
-            } else {
-                nextPlayer();
-                setState(SHOWING_SEQUENCE);
-            }
         }
+
+        setState(GAME_OVER);
         return;
     }
 
     // Brief pause before next round
     delay(200);
 
-    // Add next color and show sequence again
+    // Extend sequence and continue (same for single and multiplayer)
     extendSequence();
     setState(SHOWING_SEQUENCE);
 }
@@ -374,68 +365,41 @@ void SimonGame::handleInputWrong() {
         setState(GAME_OVER);
 
     } else if (gameMode == PASS_AND_PLAY) {
-        // Pass-and-play mode - eliminate player and move to next
-        DEBUG_PRINTF("[GAME] Player %s eliminated with score %d\n",
-                    players[currentPlayerIndex].playerName.c_str(), currentScore);
-
-        eliminateCurrentPlayer();
-
-        // Check if game is over (only one player left)
-        if (isLastPlayerStanding()) {
-            DEBUG_PRINTLN("[GAME] Pass-and-play winner determined!");
-            // Record all player sessions
-            for (uint8_t i = 0; i < numPlayers; i++) {
-                currentPlayerId = players[i].playerId;
-                currentScore = players[i].score;
-                recordGameSession();
-            }
-            setState(GAME_OVER);
-        } else {
-            // Move to next player
-            nextPlayer();
-            delay(1000);  // Brief pause before next player
-            setState(SHOWING_SEQUENCE);
-        }
-
-    } else if (gameMode == COMPETITIVE) {
-        // Competitive mode - record score and move to next player
+        // Pass & Play mode - player failed, their turn is over
         DEBUG_PRINTF("[GAME] Player %s finished with score %d\n",
                     players[currentPlayerIndex].playerName.c_str(), currentScore);
 
+        // Save this player's final score and mark as played
         players[currentPlayerIndex].score = currentScore;
-        players[currentPlayerIndex].eliminated = true;
+        players[currentPlayerIndex].hasPlayed = true;
 
-        // Check if all players have finished
-        if (currentPlayerIndex >= numPlayers - 1) {
-            DEBUG_PRINTLN("[GAME] All players finished!");
-            // Record all player sessions
-            for (uint8_t i = 0; i < numPlayers; i++) {
-                currentPlayerId = players[i].playerId;
-                currentScore = players[i].score;
-                recordGameSession();
-            }
+        // Record their game session
+        currentPlayerId = players[currentPlayerIndex].playerId;
+        recordGameSession();
+
+        // Check if all players have had their turn
+        if (allPlayersFinished()) {
+            DEBUG_PRINTLN("[GAME] All players finished - game over!");
             setState(GAME_OVER);
         } else {
             // Move to next player and reset for their turn
             nextPlayer();
-            delay(1000);  // Brief pause before next player
 
-            // Reset sequence for next player
-            sequenceLength = 0;
+            DEBUG_PRINTF("[GAME] Next player: %s\n", players[currentPlayerIndex].playerName.c_str());
+
+            delay(2000);  // Pause between players
+
+            // Reset score and position for new player
+            // NOTE: Keep the same sequence - all players play the same challenge
             currentScore = 0;
             currentStep = 0;
-
-            // Clear and start fresh sequence
-            for (uint8_t i = 0; i < MAX_SEQUENCE_LENGTH; i++) {
-                sequence[i] = NONE;
-            }
-            extendSequence();
+            sequenceLength = 1;  // Start from beginning of same sequence
 
             setState(SHOWING_SEQUENCE);
         }
-    }
 
-    sendMultiplayerUpdate();
+        sendMultiplayerUpdate();
+    }
 }
 
 void SimonGame::handleGameOver() {
@@ -490,9 +454,25 @@ Color SimonGame::generateRandomColor() {
 
 void SimonGame::extendSequence() {
     if (sequenceLength < MAX_SEQUENCE_LENGTH) {
-        sequence[sequenceLength] = generateRandomColor();
-        sequenceLength++;
-        DEBUG_PRINTF("[GAME] Sequence extended to length %d\n", sequenceLength);
+        // In multiplayer, reuse existing sequence up to masterSequenceLength
+        if (gameMode == PASS_AND_PLAY && sequenceLength < masterSequenceLength) {
+            // Just increment - color already exists in sequence array
+            sequenceLength++;
+            DEBUG_PRINTF("[GAME] Reusing sequence at length %d (master: %d)\n",
+                        sequenceLength, masterSequenceLength);
+        } else {
+            // Generate new random color (single player or extending beyond master)
+            sequence[sequenceLength] = generateRandomColor();
+            sequenceLength++;
+
+            // Update master sequence length in multiplayer
+            if (gameMode == PASS_AND_PLAY && sequenceLength > masterSequenceLength) {
+                masterSequenceLength = sequenceLength;
+                DEBUG_PRINTF("[GAME] Master sequence extended to %d\n", masterSequenceLength);
+            } else {
+                DEBUG_PRINTF("[GAME] Sequence extended to length %d\n", sequenceLength);
+            }
+        }
     }
 }
 
@@ -701,51 +681,39 @@ void SimonGame::sendGameOverUpdate(bool newHighScore) {
 // ============================================================================
 
 void SimonGame::nextPlayer() {
-    // Find next non-eliminated player
+    // Find next player who hasn't played yet
     uint8_t startIndex = currentPlayerIndex;
 
     do {
         currentPlayerIndex = (currentPlayerIndex + 1) % numPlayers;
 
         // If we've gone full circle, break
-        if (currentPlayerIndex == startIndex && players[currentPlayerIndex].eliminated) {
+        if (currentPlayerIndex == startIndex && players[currentPlayerIndex].hasPlayed) {
             break;
         }
 
-        // Found a non-eliminated player
-        if (!players[currentPlayerIndex].eliminated) {
+        // Found a player who hasn't played yet
+        if (!players[currentPlayerIndex].hasPlayed) {
             currentPlayerId = players[currentPlayerIndex].playerId;
-            currentScore = players[currentPlayerIndex].score;
 
             DEBUG_PRINTF("[GAME] Next player: %s (index %d)\n",
                         players[currentPlayerIndex].playerName.c_str(), currentPlayerIndex);
 
-            sendMultiplayerUpdate();
             return;
         }
     } while (true);
 
-    DEBUG_PRINTLN("[GAME] Warning: No non-eliminated players found!");
+    DEBUG_PRINTLN("[GAME] Warning: All players have already played!");
 }
 
-void SimonGame::eliminateCurrentPlayer() {
-    players[currentPlayerIndex].eliminated = true;
-    players[currentPlayerIndex].score = currentScore;
-
-    DEBUG_PRINTF("[GAME] Player %s eliminated\n", players[currentPlayerIndex].playerName.c_str());
-}
-
-bool SimonGame::isLastPlayerStanding() {
-    uint8_t activePlayers = 0;
-
+bool SimonGame::allPlayersFinished() {
+    // Check if all players have had their turn
     for (uint8_t i = 0; i < numPlayers; i++) {
-        if (!players[i].eliminated) {
-            activePlayers++;
+        if (!players[i].hasPlayed) {
+            return false;  // Found a player who hasn't played yet
         }
     }
-
-    DEBUG_PRINTF("[GAME] Active players remaining: %d\n", activePlayers);
-    return activePlayers <= 1;
+    return true;  // All players have finished
 }
 
 void SimonGame::sendMultiplayerUpdate() {
@@ -766,7 +734,7 @@ void SimonGame::sendMultiplayerUpdate() {
         playerObj["id"] = players[i].playerId;
         playerObj["name"] = players[i].playerName;
         playerObj["score"] = players[i].score;
-        playerObj["eliminated"] = players[i].eliminated;
+        playerObj["hasPlayed"] = players[i].hasPlayed;
     }
 
     wsHandler->broadcast(doc);

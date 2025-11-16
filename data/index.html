@@ -9,6 +9,15 @@
     <link rel="manifest" href="manifest.json">
 </head>
 <body>
+    <!-- Connection Overlay -->
+    <div id="connectionOverlay" class="connection-overlay">
+        <div class="overlay-content">
+            <div class="spinner"></div>
+            <h2>Connecting to Device...</h2>
+            <p>Please wait while we establish connection</p>
+        </div>
+    </div>
+
     <div class="container">
         <!-- Header -->
         <header>
@@ -95,21 +104,7 @@
         <section id="multiplayer-tab" class="tab-content">
             <div class="card">
                 <h2>👥 Multiplayer Mode</h2>
-                <p class="help-text">Play with 2-4 players on the same device!</p>
-
-                <div class="control-group">
-                    <label>Game Mode:</label>
-                    <div class="radio-group">
-                        <label class="radio-label">
-                            <input type="radio" name="gameMode" value="1" checked>
-                            <span>Pass & Play - Players take turns on same sequence</span>
-                        </label>
-                        <label class="radio-label">
-                            <input type="radio" name="gameMode" value="2">
-                            <span>Competitive - Each player gets their own sequence</span>
-                        </label>
-                    </div>
-                </div>
+                <p class="help-text">Players take turns - each plays until they fail. Highest score wins!</p>
 
                 <div class="control-group">
                     <label for="multiplayerDifficulty">Difficulty:</label>

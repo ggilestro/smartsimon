@@ -39,8 +39,7 @@ enum GameState {
  */
 enum GameMode {
     SINGLE_PLAYER,     // Single player mode (default)
-    PASS_AND_PLAY,     // Players take turns on same sequence
-    COMPETITIVE        // Players compete for best score
+    PASS_AND_PLAY      // Players take turns, each plays until they fail
 };
 
 /**
@@ -50,7 +49,7 @@ struct PlayerScore {
     String playerId;
     String playerName;
     uint8_t score;
-    bool eliminated;   // For pass-and-play mode
+    bool hasPlayed;    // Has finished their turn
 };
 
 /**
@@ -225,6 +224,7 @@ private:
     PlayerScore players[4];  // Max 4 players
     uint8_t numPlayers;
     uint8_t currentPlayerIndex;
+    uint8_t masterSequenceLength;  // Max sequence reached by any player
 
     // Sequence data
     Color sequence[MAX_SEQUENCE_LENGTH];
@@ -356,7 +356,6 @@ private:
      * Multiplayer helper methods
      */
     void nextPlayer();
-    void eliminateCurrentPlayer();
-    bool isLastPlayerStanding();
+    bool allPlayersFinished();
     void sendMultiplayerUpdate();
 };
