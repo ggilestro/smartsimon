@@ -4,6 +4,13 @@
  * This file contains all global configuration constants, default settings,
  * and feature flags for the Simon Says game.
  *
+ * MULTI-PLATFORM SUPPORT:
+ * This project supports both ESP32-WROOM-32 and ESP32-C3 boards.
+ * Platform selection is automatic based on PlatformIO environment:
+ *   - Use 'platformio run -e esp32dev' for ESP32-WROOM-32
+ *   - Use 'platformio run -e esp32-c3' for ESP32-C3
+ * GPIO pin mappings are automatically configured in hardware/gpio_config.h
+ *
  * Author: Giorgio Gilestro (giorgio@gilest.ro)
  * Date: 2025-11-09
  */

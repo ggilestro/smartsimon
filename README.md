@@ -3,7 +3,7 @@
 A modernized version of the classic "Simon Says" electronic memory game, powered by an ESP32 microcontroller with WiFi capabilities for web-based control, score tracking, and analytics.
 
 **Author:** Giorgio Gilestro (giorgio@gilest.ro)
-**Platform:** ESP32-WROOM-32
+**Platform:** ESP32-WROOM-32 / ESP32-C3 (multi-platform support)
 **Framework:** Arduino/PlatformIO
 **Version:** 1.0.0
 
@@ -19,11 +19,20 @@ A modernized version of the classic "Simon Says" electronic memory game, powered
 
 ## Hardware Requirements
 
+### Supported Boards
+
+This project supports multiple ESP32 variants with automatic GPIO configuration:
+
+- **ESP32-WROOM-32** - Original dual-core Xtensa processor (recommended)
+- **ESP32-C3** - RISC-V single-core processor (compact alternative)
+
+Both boards are fully compatible and use the same code. Pin mappings are automatically configured at compile time.
+
 ### Components
 
 | Component | Quantity | Notes |
 |-----------|----------|-------|
-| ESP32-WROOM-32 | 1 | Main microcontroller |
+| ESP32-WROOM-32 or ESP32-C3 | 1 | Main microcontroller |
 | Tactile switches | 4 | One per color (from original Simon) |
 | LEDs (various colors) | 4 | Red, Green, Blue, Yellow (from original Simon) |
 | Piezo buzzer/speaker | 1 | For sound effects (from original Simon) |
@@ -65,6 +74,40 @@ Battery Monitoring:
 Status:
   GPIO 2   ──→  Onboard LED (built-in on ESP32)
 ```
+
+### Pin Connections (ESP32-C3)
+
+```
+┌─────────────────────────────────────────┐
+│          ESP32-C3 PINOUT                │
+└─────────────────────────────────────────┘
+
+LEDs (Output, Active HIGH):
+  GPIO 3   ──→  [330Ω] ──→  LED Red    ──→  GND
+  GPIO 4   ──→  [330Ω] ──→  LED Green  ──→  GND
+  GPIO 5   ──→  [330Ω] ──→  LED Blue   ──→  GND
+  GPIO 6   ──→  [330Ω] ──→  LED Yellow ──→  GND
+
+Buttons (Input, Active LOW with pull-ups):
+  3.3V ──→  [Pull-up] ──→  GPIO 7   (Button Red)    ──→  Switch ──→  GND
+  3.3V ──→  [Pull-up] ──→  GPIO 10  (Button Green)  ──→  Switch ──→  GND
+  3.3V ──→  [Pull-up] ──→  GPIO 18  (Button Blue)   ──→  Switch ──→  GND
+  3.3V ──→  [Pull-up] ──→  GPIO 19  (Button Yellow) ──→  Switch ──→  GND
+
+Audio:
+  GPIO 20  ──→  Piezo Speaker ──→  GND
+
+Power Control:
+  GPIO 21  ──→  Power Button ──→  GND
+
+Battery Monitoring:
+  Battery+ ──→  [10kΩ] ──→  GPIO 1 (ADC) ──→  [10kΩ] ──→  GND
+
+Status:
+  GPIO 8   ──→  Onboard LED (built-in on ESP32-C3)
+```
+
+> **Note:** Pin mappings are automatically selected based on the build environment. No code changes needed!
 
 ### Power Circuit
 
@@ -115,24 +158,41 @@ Status:
    ```
 
 3. **Build the project:**
+
+   **For ESP32-WROOM-32:**
    ```bash
-   pio run
+   pio run -e esp32dev
+   ```
+
+   **For ESP32-C3:**
+   ```bash
+   pio run -e esp32-c3
    ```
 
 4. **Upload to ESP32:**
+
+   **For ESP32-WROOM-32:**
    ```bash
-   pio run --target upload
+   pio run -e esp32dev --target upload
+   ```
+
+   **For ESP32-C3:**
+   ```bash
+   pio run -e esp32-c3 --target upload
    ```
 
 5. **Upload filesystem (web interface):**
    ```bash
-   pio run --target uploadfs
+   # Use -e esp32dev OR -e esp32-c3 depending on your board
+   pio run -e esp32dev --target uploadfs
    ```
 
 6. **Monitor serial output:**
    ```bash
    pio device monitor
    ```
+
+> **Tip:** The default environment is `esp32dev`. To switch to ESP32-C3, always specify `-e esp32-c3` in your commands.
 
 ### WiFi Configuration
 
@@ -317,15 +377,21 @@ Simon/
 ### Building & Testing
 
 ```bash
-# Clean build
-pio run --target clean
-pio run
+# Clean build (ESP32-WROOM-32)
+pio run -e esp32dev --target clean
+pio run -e esp32dev
 
-# Upload code
-pio run --target upload
+# Clean build (ESP32-C3)
+pio run -e esp32-c3 --target clean
+pio run -e esp32-c3
 
-# Upload filesystem
-pio run --target uploadfs
+# Upload code (specify environment)
+pio run -e esp32dev --target upload    # For ESP32-WROOM-32
+pio run -e esp32-c3 --target upload    # For ESP32-C3
+
+# Upload filesystem (specify environment)
+pio run -e esp32dev --target uploadfs  # For ESP32-WROOM-32
+pio run -e esp32-c3 --target uploadfs  # For ESP32-C3
 
 # Run unit tests
 pio test
@@ -334,7 +400,7 @@ pio test
 pio device monitor
 
 # Build and upload in one command
-pio run --target upload && pio device monitor
+pio run -e esp32dev --target upload && pio device monitor
 ```
 
 ### Adding Features
