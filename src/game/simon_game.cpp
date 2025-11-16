@@ -26,7 +26,9 @@ SimonGame::SimonGame(LEDController* leds, ButtonHandler* buttons, AudioControlle
     currentScore(0),
     stateStartTime(0),
     lastInputTime(0),
-    gameStartTime(0) {
+    gameStartTime(0),
+    currentInputLED(NONE),
+    inputLEDEndTime(0) {
 
     // Initialize sequence array
     for (uint8_t i = 0; i < MAX_SEQUENCE_LENGTH; i++) {
@@ -71,6 +73,16 @@ void SimonGame::update() {
     // Update button states
     btn->update();
 
+    // Update audio (for non-blocking tones)
+    audio->update();
+
+    // Update input LED (turn off after timeout)
+    if (currentInputLED != NONE && inputLEDEndTime > 0 && millis() >= inputLEDEndTime) {
+        led->off(currentInputLED);
+        currentInputLED = NONE;
+        inputLEDEndTime = 0;
+    }
+
     // Handle current state
     switch (state) {
         case IDLE:
@@ -105,6 +117,11 @@ void SimonGame::startGame(DifficultyLevel difficulty) {
 
     // Set difficulty
     setDifficulty(difficulty);
+
+    // Reset to single player mode
+    gameMode = SINGLE_PLAYER;
+    numPlayers = 0;
+    masterSequenceLength = 0;
 
     // Reset game state
     sequenceLength = 0;
@@ -287,10 +304,21 @@ void SimonGame::handleWaitingInput() {
     if (pressed != NONE) {
         DEBUG_PRINTF("[GAME] Player pressed %s\n", colorToString(pressed));
 
-        // Light up LED and play tone for feedback
+        // Turn off any currently lit LED from previous button press
+        // Reason: Original Simon turns off old LED when new button pressed
+        if (currentInputLED != NONE) {
+            led->off(currentInputLED);
+        }
+
+        // Play non-blocking tone like original Simon
+        // Reason: Original Simon plays full tone but accepts next input immediately
+        audio->playColor(pressed, PLAYER_INPUT_FEEDBACK_MS, false);
+
+        // Turn on LED for this button (will auto-off after same duration as tone)
+        // Reason: LED stays on for full tone duration in original Simon
         led->on(pressed);
-        audio->playColor(pressed, settings.toneDuration);
-        led->off(pressed);
+        currentInputLED = pressed;
+        inputLEDEndTime = millis() + PLAYER_INPUT_FEEDBACK_MS;
 
         // Validate input
         bool correct = validateInput(pressed);
@@ -331,20 +359,12 @@ void SimonGame::handleInputCorrect() {
         sendMultiplayerUpdate();
     }
 
-    // Check if max length reached
-    if (sequenceLength >= settings.maxLength) {
-        DEBUG_PRINTLN("[GAME] Maximum length reached - you win!");
+    // Game continues indefinitely until player makes a mistake
+    // Reason: Original Simon Says has no maximum length
 
-        if (gameMode == SINGLE_PLAYER) {
-            updateHighScore();
-        }
-
-        setState(GAME_OVER);
-        return;
-    }
-
-    // Brief pause before next round
-    delay(200);
+    // Wait for last input tone/LED to finish before next round
+    // Reason: Last button press triggers non-blocking tone/LED
+    delay(PLAYER_INPUT_FEEDBACK_MS);
 
     // Extend sequence and continue (same for single and multiplayer)
     extendSequence();
@@ -479,20 +499,62 @@ void SimonGame::extendSequence() {
 void SimonGame::playSequence() {
     DEBUG_PRINTLN("[GAME] Playing sequence...");
 
+    // Stop any player input tones that might still be playing
+    // Reason: Prevent interference between player tones and sequence playback
+    audio->stop();
+
+    // Turn off all LEDs and clear tracking
+    led->allOff();
+    currentInputLED = NONE;
+    inputLEDEndTime = 0;
+
     // Send sequence update to WebSocket
     sendSequenceUpdate();
 
     // Small delay before starting
     delay(500);
 
+    // Original Simon Says timing with difficulty multiplier
+    // Sequences 1-5: 500ms tone, 100ms interval (MEDIUM)
+    // Sequences 6+:  400ms tone, 80ms interval (MEDIUM)
+    // EASY: 25% slower (multiply by 1.25)
+    // HARD: 25% faster (multiply by 0.75)
+
+    float difficultyMultiplier;
+    switch (currentDifficulty) {
+        case EASY:
+            difficultyMultiplier = 1.25f;  // 25% slower
+            break;
+        case HARD:
+            difficultyMultiplier = 0.75f;  // 25% faster
+            break;
+        case MEDIUM:
+        default:
+            difficultyMultiplier = 1.0f;   // Original timing
+            break;
+    }
+
+    uint16_t toneDuration, toneInterval;
+    if (sequenceLength <= 5) {
+        toneDuration = (uint16_t)(500 * difficultyMultiplier);
+        toneInterval = (uint16_t)(100 * difficultyMultiplier);
+        DEBUG_PRINTF("[GAME] Seq 1-5 timing: %dms tone, %dms interval (difficulty: %s)\n",
+                    toneDuration, toneInterval, settings.name);
+    } else {
+        toneDuration = (uint16_t)(400 * difficultyMultiplier);
+        toneInterval = (uint16_t)(80 * difficultyMultiplier);
+        DEBUG_PRINTF("[GAME] Seq 6+ timing: %dms tone, %dms interval (difficulty: %s)\n",
+                    toneDuration, toneInterval, settings.name);
+    }
+
     // Play each step in the sequence
     for (uint8_t i = 0; i < sequenceLength; i++) {
-        playSequenceStep(i);
+        playSequenceStep(i, toneDuration);
 
         // Only delay between tones, NOT after the last one
         // Reason: Player should be able to input immediately after last tone
         if (i < sequenceLength - 1) {
-            delay(settings.sequenceSpeed);
+            delay(toneInterval);
         }
     }
 
@@ -503,7 +565,7 @@ void SimonGame::playSequence() {
     DEBUG_PRINTLN("[GAME] Sequence complete, waiting for input");
 }
 
-void SimonGame::playSequenceStep(uint8_t index) {
+void SimonGame::playSequenceStep(uint8_t index, uint16_t toneDuration) {
     if (index >= sequenceLength) {
         return;
     }
@@ -513,7 +575,7 @@ void SimonGame::playSequenceStep(uint8_t index) {
 
     // Light LED and play tone
     led->on(color);
-    audio->playColor(color, settings.toneDuration);
+    audio->playColor(color, toneDuration);
     led->off(color);
 }
 
@@ -531,7 +593,11 @@ void SimonGame::setState(GameState newState) {
     stateStartTime = millis();
 
     // Turn off all LEDs on state change
-    led->allOff();
+    // Exception: Keep player input LED on when entering INPUT_CORRECT
+    // Reason: Last button press LED should stay on for full PLAYER_INPUT_FEEDBACK_MS
+    if (newState != INPUT_CORRECT) {
+        led->allOff();
+    }
 }
 
 uint32_t SimonGame::getStateTime() const {

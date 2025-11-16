@@ -38,10 +38,11 @@
 // ============================================================================
 
 // Maximum sequence length across all difficulties
-#define MAX_SEQUENCE_LENGTH 31
+// Reason: Set to 100 to be effectively unlimited (most players can't reach this)
+#define MAX_SEQUENCE_LENGTH 100
 
-// Default difficulty mode (0=Easy, 1=Medium, 2=Hard, 3=Expert)
-#define DEFAULT_DIFFICULTY 1
+// Default difficulty mode (0=Easy, 1=Medium, 2=Hard)
+#define DEFAULT_DIFFICULTY 1  // Medium (original Simon timing)
 
 // Timeout for player input (milliseconds)
 #define INPUT_TIMEOUT_MS 5000
@@ -146,7 +147,8 @@
 // ============================================================================
 
 // Debounce delay (milliseconds)
-#define BUTTON_DEBOUNCE_MS 50
+// Reason: Reduced from 50ms to 20ms for faster response like original Simon
+#define BUTTON_DEBOUNCE_MS 20
 
 // Long press threshold (milliseconds)
 #define BUTTON_LONG_PRESS_MS 2000
@@ -164,6 +166,14 @@
 
 // Demo mode - set to true to run hardware demo instead of game
 #define DEMO_MODE_ENABLED false
+
+// ============================================================================
+// PLAYER INPUT FEEDBACK
+// ============================================================================
+
+// Duration of tone and LED when player presses button (milliseconds)
+// Reason: Original Simon Says uses 500ms for player input feedback
+#define PLAYER_INPUT_FEEDBACK_MS 500
 
 // ============================================================================
 // DIFFICULTY MODE DEFINITIONS

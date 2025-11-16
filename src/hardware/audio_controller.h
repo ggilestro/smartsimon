@@ -89,6 +89,12 @@ public:
     void stop();
 
     /**
+     * Update audio state (for non-blocking tones)
+     * Call this regularly in loop() to auto-stop tones
+     */
+    void update();
+
+    /**
      * Set volume (0-100)
      *
      * Args:

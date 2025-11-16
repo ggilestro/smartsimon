@@ -75,10 +75,9 @@
                 <div class="control-group">
                     <label for="difficulty">Select Difficulty:</label>
                     <select id="difficulty" class="select-field">
-                        <option value="0">Easy</option>
-                        <option value="1">Medium</option>
-                        <option value="2">Hard</option>
-                        <option value="3">Expert</option>
+                        <option value="0">Easy (25% slower)</option>
+                        <option value="1" selected>Medium (Original)</option>
+                        <option value="2">Hard (25% faster)</option>
                     </select>
                 </div>
 
@@ -109,10 +108,9 @@
                 <div class="control-group">
                     <label for="multiplayerDifficulty">Difficulty:</label>
                     <select id="multiplayerDifficulty" class="select-field">
-                        <option value="0">Easy</option>
-                        <option value="1">Medium</option>
-                        <option value="2">Hard</option>
-                        <option value="3">Expert</option>
+                        <option value="0">Easy (25% slower)</option>
+                        <option value="1" selected>Medium (Original)</option>
+                        <option value="2">Hard (25% faster)</option>
                     </select>
                 </div>
 
@@ -162,7 +160,6 @@
                     <button class="difficulty-tab active" data-difficulty="0">Easy</button>
                     <button class="difficulty-tab" data-difficulty="1">Medium</button>
                     <button class="difficulty-tab" data-difficulty="2">Hard</button>
-                    <button class="difficulty-tab" data-difficulty="3">Expert</button>
                 </div>
                 <div id="difficultyScores" class="scores-list">Loading...</div>
             </div>

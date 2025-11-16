@@ -239,6 +239,10 @@ private:
     uint32_t stateStartTime;
     uint32_t lastInputTime;
 
+    // Player input LED tracking (for non-blocking LED control)
+    Color currentInputLED;
+    uint32_t inputLEDEndTime;
+
     /**
      * State machine handlers
      */
@@ -273,8 +277,9 @@ private:
      *
      * Args:
      *     index: Index of step to play
+     *     toneDuration: Duration of the tone in milliseconds
      */
-    void playSequenceStep(uint8_t index);
+    void playSequenceStep(uint8_t index, uint16_t toneDuration);
 
     /**
      * Check if player input matches expected color

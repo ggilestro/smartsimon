@@ -16,11 +16,10 @@
  * Difficulty level enumeration
  */
 enum DifficultyLevel : uint8_t {
-    EASY = 0,
-    MEDIUM = 1,
-    HARD = 2,
-    EXPERT = 3,
-    NUM_DIFFICULTIES = 4
+    EASY = 0,      // 25% slower than original Simon
+    MEDIUM = 1,    // Original Simon timing (default)
+    HARD = 2,      // 25% faster than original Simon
+    NUM_DIFFICULTIES = 3
 };
 
 /**
@@ -47,8 +46,7 @@ inline const DifficultySettings& getDifficultySettings(DifficultyLevel level) {
     static const DifficultySettings difficulties[NUM_DIFFICULTIES] = {
         {"Easy", DIFF_EASY_SPEED, DIFF_EASY_DURATION, DIFF_EASY_MAX_LENGTH, DIFF_EASY_WINDOW},
         {"Medium", DIFF_MEDIUM_SPEED, DIFF_MEDIUM_DURATION, DIFF_MEDIUM_MAX_LENGTH, DIFF_MEDIUM_WINDOW},
-        {"Hard", DIFF_HARD_SPEED, DIFF_HARD_DURATION, DIFF_HARD_MAX_LENGTH, DIFF_HARD_WINDOW},
-        {"Expert", DIFF_EXPERT_SPEED, DIFF_EXPERT_DURATION, DIFF_EXPERT_MAX_LENGTH, DIFF_EXPERT_WINDOW}
+        {"Hard", DIFF_HARD_SPEED, DIFF_HARD_DURATION, DIFF_HARD_MAX_LENGTH, DIFF_HARD_WINDOW}
     };
 
     if (level < NUM_DIFFICULTIES) {

@@ -134,6 +134,13 @@ void AudioController::stop() {
     toneEndTime = 0;
 }
 
+void AudioController::update() {
+    // Check if we need to stop a non-blocking tone
+    if (toneEndTime > 0 && millis() >= toneEndTime) {
+        stop();
+    }
+}
+
 void AudioController::setVolume(uint8_t vol) {
     volume = constrain(vol, 0, 100);
     DEBUG_PRINTF("[AUDIO] Volume set to %d\n", volume);
