@@ -338,7 +338,12 @@ void SimonGame::playSequence() {
     // Play each step in the sequence
     for (uint8_t i = 0; i < sequenceLength; i++) {
         playSequenceStep(i);
-        delay(settings.sequenceSpeed);
+
+        // Only delay between tones, NOT after the last one
+        // Reason: Player should be able to input immediately after last tone
+        if (i < sequenceLength - 1) {
+            delay(settings.sequenceSpeed);
+        }
     }
 
     // Reset step counter for input
